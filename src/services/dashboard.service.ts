@@ -360,14 +360,6 @@ async function UpdateEventImageService(param: IUpdateEventImageParam) {
   }
 }
 
-async function AcceptTransactionService(transactionId: string) {
-  try {
-    const transaction = await prisma.transaction.findUnique({
-      where: { id: transactionId },
-    });
-  } catch (err) {}
-}
-
 export {
   GetOrganizerEventsService,
   GetEventStatisticsService,

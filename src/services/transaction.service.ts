@@ -311,22 +311,64 @@ async function EOActionTransactionService(param: IEOActionTransactionParam) {
           },
         });
 
-        // d) Send email to customer
+        // Replace template with hardcoded HTML
+        const htmlContent = `
+        <html lang="en">
+          <head>
+            <meta charset="UTF-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+            <title>Transaction Rejected</title>
+          </head>
+          <body>
+            <div
+              style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;"
+            >
+              <div style="text-align: center; margin-bottom: 20px;">
+                <h2 style="color: #e53e3e;">Transaction Rejected</h2>
+              </div>
 
-        const emailTemplatePatch = path.join(
-          __dirname,
-          "../templates",
-          "ticketRejected.template.hbs"
-        );
+              <div
+                style="background-color: #f8f8f8; border-radius: 8px; padding: 20px; margin-bottom: 20px;"
+              >
+                <p>Hi ${transaction.user.username},</p>
+                <p>We regret to inform you that your transaction for
+                  <strong>${transaction.event.name}</strong>
+                  has been rejected by the event organizer.</p>
 
-        const templateSource = fs.readFileSync(emailTemplatePatch, "utf8");
-        const compiledEmailTemplate = Handlebars.compile(templateSource);
-        const htmlContent = compiledEmailTemplate({
-          username: transaction.user.username,
-          eventName: transaction.event.name,
-          transactionId: transaction.id,
-          rejectionReason: "Your transaction has been rejected",
-        });
+                <div
+                  style="background-color: #fff; border-left: 4px solid #e53e3e; padding: 15px; margin: 15px 0;"
+                >
+                  <p style="margin: 0;"><strong>Transaction ID:</strong>
+                    ${transaction.id}</p>
+                  <p style="margin: 8px 0 0;"><strong>Rejection Reason:</strong>
+                    Your transaction has been rejected</p>
+                </div>
+
+                <p>Any points, vouchers, or coupons used for this transaction have been
+                  returned to your account. The seats you reserved have also been made
+                  available again.</p>
+              </div>
+
+              <div style="margin: 24px 0; text-align: center;">
+                <a
+                  href="https://yourdomain.com/my-transactions"
+                  style="background-color: #4F46E5; color: white; padding: 12px 20px; text-decoration: none; border-radius: 6px; display: inline-block;"
+                >
+                  View My Transactions
+                </a>
+              </div>
+
+              <div
+                style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; font-size: 14px; color: #666;"
+              >
+                <p>If you have any questions about this rejection, please contact the
+                  event organizer directly or reply to this email for assistance.</p>
+                <p>Thank you for using our platform.</p>
+                <p>Best regards,<br /><strong>Ticket Team</strong></p>
+              </div>
+            </div>
+          </body>
+        </html>`;
 
         await transporter.sendMail({
           from: '"Ticket Admin" <no-reply@yourdomain.com>',
@@ -338,13 +380,89 @@ async function EOActionTransactionService(param: IEOActionTransactionParam) {
         return updatedTransaction;
       });
     } else {
-      // For confirmation, just update the status
+      // For confirmation, update the status and send confirmation email
       const updatedTransaction = await prisma.transaction.update({
         where: { id: transactionId },
         data: {
           status: updatedStatus,
           updated_at: new Date(),
         },
+        include: {
+          event: true,
+          user: {
+            select: {
+              username: true,
+              email: true,
+            },
+          },
+        },
+      });
+
+      // Send confirmation email
+      const htmlContent = `
+      <html lang="en">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>Transaction Confirmed</title>
+        </head>
+        <body>
+          <div
+            style="font-family: sans-serif; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;"
+          >
+            <div style="text-align: center; margin-bottom: 20px;">
+              <h2 style="color: #10b981;">Transaction Confirmed</h2>
+            </div>
+
+            <div
+              style="background-color: #f8f8f8; border-radius: 8px; padding: 20px; margin-bottom: 20px;"
+            >
+              <p>Hi ${updatedTransaction.user.username},</p>
+              <p>Great news! Your transaction for
+                <strong>${updatedTransaction.event.name}</strong>
+                has been confirmed by the event organizer.</p>
+
+              <div
+                style="background-color: #fff; border-left: 4px solid #10b981; padding: 15px; margin: 15px 0;"
+              >
+                <p style="margin: 0;"><strong>Transaction ID:</strong>
+                  ${updatedTransaction.id}</p>
+                <p style="margin: 8px 0 0;"><strong>Event Date:</strong>
+                  ${new Date(
+                    updatedTransaction.event.start_date
+                  ).toLocaleDateString()}</p>
+                <p style="margin: 8px 0 0;"><strong>Quantity:</strong>
+                  ${updatedTransaction.quantity} ticket(s)</p>
+              </div>
+
+              <p>You're all set! Your tickets are now confirmed and ready for the event.</p>
+            </div>
+
+            <div style="margin: 24px 0; text-align: center;">
+              <a
+                href="https://yourdomain.com/my-tickets"
+                style="background-color: #4F46E5; color: white; padding: 12px 20px; text-decoration: none; border-radius: 6px; display: inline-block;"
+              >
+                View My Tickets
+              </a>
+            </div>
+
+            <div
+              style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; font-size: 14px; color: #666;"
+            >
+              <p>We look forward to seeing you at the event!</p>
+              <p>If you have any questions, please contact the event organizer or reply to this email.</p>
+              <p>Best regards,<br /><strong>Ticket Team</strong></p>
+            </div>
+          </div>
+        </body>
+      </html>`;
+
+      await transporter.sendMail({
+        from: '"Ticket Admin" <no-reply@yourdomain.com>',
+        to: updatedTransaction.user.email,
+        subject: "Transaction Confirmed",
+        html: htmlContent,
       });
 
       return updatedTransaction;

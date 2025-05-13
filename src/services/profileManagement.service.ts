@@ -49,7 +49,6 @@ async function forgotPasswordService(param: iForgotPasswordParam) {
     const user = await findUserByEmail(email);
 
     //get email from param
-
     if (!user) throw new Error("User not found");
 
     const resetToken = generateResetToken();
@@ -66,17 +65,32 @@ async function forgotPasswordService(param: iForgotPasswordParam) {
       },
     });
 
-    const forgotPassEmailTemplate = path.join(
-      __dirname,
-      "../templates/",
-      "forgotPassword.template.hbs"
-    );
-    const templateSource = fs.readFileSync(forgotPassEmailTemplate, "utf8");
-    const forgotPassCompiledTemplate = Handlebars.compile(templateSource);
-    const htmlContent = forgotPassCompiledTemplate({
-      email,
-      resetToken,
-    });
+    // Replace template with hardcoded HTML
+    const htmlContent = `
+    <html lang="en">
+      <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Forgot Your Password?</title>
+      </head>
+      <body>
+        <div style="font-family: sans-serif; color: #333;">
+          <h2 style="color: #4F46E5;">Reset Your Password</h2>
+          <p>You requested a password reset for your Ticket account.</p>
+          <p>Click the button below to set a new password. This link is valid for 24
+            hours.</p>
+          <div style="margin: 24px 0;">
+            <a
+              href="https://yourdomain.com/reset-password?email=${email}&token=${resetToken}"
+              style="background-color: #4F46E5; color: white; padding: 12px 20px; text-decoration: none; border-radius: 6px;"
+            >
+              Reset Password
+            </a>
+          </div>
+          <p>If you didn't request this, please ignore this email.</p>
+        </div>
+      </body>
+    </html>`;
 
     await transporter.sendMail({
       from: `"Ticket Admin" ${NODEMAILER_USER}`,
